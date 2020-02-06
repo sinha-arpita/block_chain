@@ -10,8 +10,8 @@ class Blockchain(object):
     def __init__(self):
         self.chain = []
         self.current_transactions = []
+        self.nodes = set()
 
-        # Create the genesis block
         self.new_block(previous_hash=1, proof=100)
 
     def new_block(self, proof, previous_hash=None):
@@ -31,13 +31,23 @@ class Blockchain(object):
         """
 
         block = {
-            # TODO
+            'index': len(self.chain) + 1,
+            'timestamp': time(),
+            'transactions': self.current_transactions,
+            'proof': proof,
+            'previous_hash': previous_hash or self.hash(self.chain[-1]),  # self.chain[-1] gives last block in chain
         }
+
+        # Reset the current list of transactions
+        self.current_transactions = []
+
+        self.chain.append(block)
+        return block
 
         # Reset the current list of transactions
         # Append the chain to the block
         # Return the new block
-        pass
+
 
     def hash(self, block):
         """
@@ -56,6 +66,7 @@ class Blockchain(object):
         # or we'll have inconsistent hashes
 
         # TODO: Create the block_string
+        block_string = json.dumps(block, sort_keys=True).encode()
 
         # TODO: Hash this string using sha256
 
@@ -66,7 +77,7 @@ class Blockchain(object):
         # easier to work with and understand
 
         # TODO: Return the hashed block string in hexadecimal format
-        pass
+        return hashlib.sha256(block_string).hexdigest()
 
     @property
     def last_block(self):
@@ -75,14 +86,17 @@ class Blockchain(object):
     def proof_of_work(self, block):
         """
         Simple Proof of Work Algorithm
-        Stringify the block and look for a proof.
-        Loop through possibilities, checking each one against `valid_proof`
-        in an effort to find a number that is a valid proof
+        Find a number p such that ha contains 6 leading
+        zeroes
         :return: A valid proof for the provided block
         """
         # TODO
-        pass
-        # return proof
+        block_string = json.dumps(self.last_block, sort_keys=True).encode()
+        proof = 0
+        while self.valid_proof(block_string, proof) is False:
+            proof += 1
+
+        return proof
 
     @staticmethod
     def valid_proof(block_string, proof):
@@ -97,7 +111,9 @@ class Blockchain(object):
         :return: True if the resulting hash is a valid proof, False otherwise
         """
         # TODO
-        pass
+        guess = f'{block_string}{proof}'.encode()
+        guess_hash = hashlib.sha256(guess).hexdigest()
+        return guess_hash[:4] == "0000"
         # return True or False
 
 
@@ -113,12 +129,28 @@ blockchain = Blockchain()
 
 @app.route('/mine', methods=['GET'])
 def mine():
-    # Run the proof of work algorithm to get the next proof
+    # We run the proof of work algorithm to get the next proof...
+    proof = blockchain.proof_of_work()
 
-    # Forge the new Block by adding it to the chain with the proof
+    # We must receive a reward for finding the proof.
+    # TODO:
+    blockchain.new_transaction(sender="0", recipient=node_identifier, amount=1)
+    # The sender is "0" to signify that this node has mine a new coin
+    # The recipient is the current node, it did the mining!
+    # The amount is 1 coin as a reward for mining the next block
 
+    # Forge the new Block by adding it to the chain
+    # TODO
+    previous_hash = blockchain.hash(blockchain.last_block)
+    block = blockchain.new_block(proof, previous_hash)
+
+    # Send a response with the new block
     response = {
-        # TODO: Send a JSON response with the new block
+        'message': "New Block Forged",
+        'index': block['index'],
+        'transactions': block['transactions'],
+        'proof': block['proof'],
+        'previous_hash': block['previous_hash'],
     }
 
     return jsonify(response), 200
@@ -128,10 +160,11 @@ def mine():
 def full_chain():
     response = {
         # TODO: Return the chain and its current length
+        "chain": blockchain.chain
     }
     return jsonify(response), 200
 
 
 # Run the program on port 5000
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001)
